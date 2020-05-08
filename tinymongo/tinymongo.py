@@ -12,36 +12,34 @@ from operator import itemgetter
 from uuid import uuid1
 
 from tinydb import Query, TinyDB, where
-from .results import (
-    InsertOneResult,
-    InsertManyResult,
-    UpdateResult,
-    DeleteResult
-)
+from .results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
 from .errors import DuplicateKeyError
 
 try:
-  basestring
+    basestring
 except NameError:
-  basestring = str
+    basestring = str
 
 
 logger = logging.getLogger(__name__)
 
 
 def Q(query, key):
-    return reduce(lambda partial_query, field: partial_query[field], key.split('.'), query)
+    return reduce(
+        lambda partial_query, field: partial_query[field], key.split("."), query
+    )
 
 
 class TinyMongoClient(object):
     """Represents the Tiny `db` client"""
+
     def __init__(self, foldername=u"tinydb", **kwargs):
         """Initialize container folder"""
         self._foldername = foldername
         try:
             os.mkdir(foldername)
         except OSError as x:
-            logger.info('{}'.format(x))
+            logger.info("{}".format(x))
 
     @property
     def _storage(self):
@@ -68,7 +66,7 @@ class TinyMongoClient(object):
                     return serialization
 
         """
-        return TinyDB.DEFAULT_STORAGE
+        return TinyDB.default_storage_class
 
     def __getitem__(self, key):
         """Gets a new or existing database based in key"""
@@ -85,13 +83,13 @@ class TinyMongoClient(object):
 
 class TinyMongoDatabase(object):
     """Representation of a Pymongo database"""
+
     def __init__(self, database, foldername, storage):
         """Initialize a TinyDB file named as the db name in the given folder
         """
         self._foldername = foldername
         self.tinydb = TinyDB(
-            os.path.join(foldername, database + u".json"),
-            storage=storage
+            os.path.join(foldername, database + u".json"), storage=storage
         )
 
     def __getattr__(self, name):
@@ -162,8 +160,10 @@ class TinyMongoCollection(object):
         exist.
         """
         if self.table:
-            self.parent.tinydb.purge_table(self.tablename)
+            self.parent.tinydb.drop_table(self.tablename)
             return True
+            # from tinydb.database import TinyDB
+            # TinyDB().
         else:
             return False
 
@@ -187,19 +187,19 @@ class TinyMongoCollection(object):
         if not isinstance(doc, dict):
             raise ValueError(u'"doc" must be a dict')
 
-        _id = doc[u'_id'] = doc.get('_id') or generate_id()
+        _id = doc[u"_id"] = doc.get("_id") or generate_id()
 
-        bypass_document_validation = kwargs.get('bypass_document_validation')
+        bypass_document_validation = kwargs.get("bypass_document_validation")
         if bypass_document_validation is True:
             # insert doc without validation of duplicated `_id`
             eid = self.table.insert(doc)
         else:
-            existing = self.find_one({'_id': _id})
+            existing = self.find_one({"_id": _id})
             if existing is None:
                 eid = self.table.insert(doc)
             else:
                 raise DuplicateKeyError(
-                    u'_id:{0} already exists in collection:{1}'.format(
+                    u"_id:{0} already exists in collection:{1}".format(
                         _id, self.tablename
                     )
                 )
@@ -218,21 +218,21 @@ class TinyMongoCollection(object):
         if not isinstance(docs, list):
             raise ValueError(u'"insert_many" requires a list input')
 
-        bypass_document_validation = kwargs.get('bypass_document_validation')
+        bypass_document_validation = kwargs.get("bypass_document_validation")
 
         if bypass_document_validation is not True:
             # get all _id in once, to reduce I/O. (without projection)
-            existing = [doc['_id'] for doc in self.find({})]
+            existing = [doc["_id"] for doc in self.find({})]
 
         _ids = list()
         for doc in docs:
 
-            _id = doc[u'_id'] = doc.get('_id') or generate_id()
+            _id = doc[u"_id"] = doc.get("_id") or generate_id()
 
             if bypass_document_validation is not True:
                 if _id in existing:
                     raise DuplicateKeyError(
-                        u'_id:{0} already exists in collection:{1}'.format(
+                        u"_id:{0} already exists in collection:{1}".format(
                             _id, self.tablename
                         )
                     )
@@ -244,7 +244,7 @@ class TinyMongoCollection(object):
 
         return InsertManyResult(
             eids=[eid for eid in results],
-            inserted_ids=[inserted_id for inserted_id in _ids]
+            inserted_ids=[inserted_id for inserted_id in _ids],
         )
 
     def parse_query(self, query):
@@ -255,11 +255,11 @@ class TinyMongoCollection(object):
         query
         :return: composite Query()
         """
-        logger.debug(u'query to parse2: {}'.format(query))
+        logger.debug(u"query to parse2: {}".format(query))
 
         # this should find all records
         if query == {} or query is None:
-            return Query()._id != u'-1'  # noqa
+            return Query()._id != u"-1"  # noqa
 
         q = None
         # find the final result of the generator
@@ -269,7 +269,7 @@ class TinyMongoCollection(object):
             else:
                 q = q & c
 
-        logger.debug(u'new query item2: {}'.format(q))
+        logger.debug(u"new query item2: {}".format(q))
 
         return q
 
@@ -284,7 +284,7 @@ class TinyMongoCollection(object):
         Query() object containing all conditions
         """
         # use this to determine gt/lt/eq on prev_query
-        logger.debug(u'query: {} prev_query: {}'.format(query, prev_key))
+        logger.debug(u"query: {} prev_query: {}".format(query, prev_key))
 
         q = Query()
         conditions = None
@@ -297,75 +297,91 @@ class TinyMongoCollection(object):
 
         # deal with the conditions
         for key, value in query.items():
-            logger.debug(u'conditions: {} {}'.format(key, value))
+            logger.debug(u"conditions: {} {}".format(key, value))
 
-            if key == u'$gte':
+            if key == u"$gte":
                 conditions = (
-                    Q(q, prev_key) >= value
-                ) if not conditions and prev_key != "$not" \
-                else (conditions & (Q(q, prev_key) >= value)) if prev_key != "$not" \
-                else (q[last_prev_key] < value)
-            elif key == u'$gt':
+                    (Q(q, prev_key) >= value)
+                    if not conditions and prev_key != "$not"
+                    else (conditions & (Q(q, prev_key) >= value))
+                    if prev_key != "$not"
+                    else (q[last_prev_key] < value)
+                )
+            elif key == u"$gt":
                 conditions = (
-                    Q(q, prev_key) > value
-                ) if not conditions and prev_key != "$not" \
-                else (conditions & (Q(q, prev_key) > value)) if prev_key != "$not" \
-                else (q[last_prev_key] <= value)
-            elif key == u'$lte':
+                    (Q(q, prev_key) > value)
+                    if not conditions and prev_key != "$not"
+                    else (conditions & (Q(q, prev_key) > value))
+                    if prev_key != "$not"
+                    else (q[last_prev_key] <= value)
+                )
+            elif key == u"$lte":
                 conditions = (
-                    Q(q, prev_key) <= value
-                ) if not conditions and prev_key != "$not" \
-                else (conditions & (Q(q, prev_key) <= value)) if prev_key != "$not" \
-                else (q[last_prev_key] > value)
-            elif key == u'$lt':
+                    (Q(q, prev_key) <= value)
+                    if not conditions and prev_key != "$not"
+                    else (conditions & (Q(q, prev_key) <= value))
+                    if prev_key != "$not"
+                    else (q[last_prev_key] > value)
+                )
+            elif key == u"$lt":
                 conditions = (
-                    Q(q, prev_key) < value
-                ) if not conditions and prev_key != "$not" \
-                else (conditions & (Q(q, prev_key) < value)) if prev_key != "$not" \
-                else (q[last_prev_key] >= value)
-            elif key == u'$ne':
+                    (Q(q, prev_key) < value)
+                    if not conditions and prev_key != "$not"
+                    else (conditions & (Q(q, prev_key) < value))
+                    if prev_key != "$not"
+                    else (q[last_prev_key] >= value)
+                )
+            elif key == u"$ne":
                 conditions = (
-                    Q(q, prev_key) != value
-                ) if not conditions and prev_key != "$not" \
-                else (conditions & (Q(q, prev_key) != value))if prev_key != "$not" \
-                else (q[last_prev_key] == value)
-            elif key == u'$not':
+                    (Q(q, prev_key) != value)
+                    if not conditions and prev_key != "$not"
+                    else (conditions & (Q(q, prev_key) != value))
+                    if prev_key != "$not"
+                    else (q[last_prev_key] == value)
+                )
+            elif key == u"$not":
                 if not isinstance(value, dict) and not isinstance(value, list):
                     conditions = (
-                        Q(q, prev_key) != value
-                    ) if not conditions and prev_key != "$not" \
-                    else (conditions & (Q(q, prev_key) != value)) \
-                    if prev_key != "$not" else (q[last_prev_key] >= value)
+                        (Q(q, prev_key) != value)
+                        if not conditions and prev_key != "$not"
+                        else (conditions & (Q(q, prev_key) != value))
+                        if prev_key != "$not"
+                        else (q[last_prev_key] >= value)
+                    )
                 else:
                     # let the value's condition be parsed below
                     pass
-            elif key == u'$regex':
-                value = value.replace('\\\\\\', '|||')
-                value = value.replace('\\\\', '|||')
-                regex = value.replace('\\', '')
-                regex = regex.replace('|||', '\\')
-                currCond = (where(prev_key).matches(regex))
+            elif key == u"$regex":
+                value = value.replace("\\\\\\", "|||")
+                value = value.replace("\\\\", "|||")
+                regex = value.replace("\\", "")
+                regex = regex.replace("|||", "\\")
+                currCond = where(prev_key).matches(regex)
                 conditions = currCond if not conditions else (conditions & currCond)
-            elif key in ['$and', '$or', '$in', '$all']:
+            elif key in ["$and", "$or", "$in", "$all"]:
                 pass
             else:
-
 
                 # don't want to use the previous key if this is a secondary key
                 # (fixes multiple item query that includes $ codes)
                 if not isinstance(value, dict) and not isinstance(value, list):
                     conditions = (
-                        (Q(q, key) == value) | (Q(q, key).any([value]))
-                    ) if not conditions else (conditions & ((Q(q, key) == value) | (Q(q, key).any([value]))))
+                        ((Q(q, key) == value) | (Q(q, key).any([value])))
+                        if not conditions
+                        else (
+                            conditions
+                            & ((Q(q, key) == value) | (Q(q, key).any([value])))
+                        )
+                    )
                     prev_key = key
 
-            logger.debug(u'c: {}'.format(conditions))
+            logger.debug(u"c: {}".format(conditions))
             if isinstance(value, dict):
                 # yield from self.parse_condition(value, key)
                 for parse_condition in self.parse_condition(value, key, prev_key):
                     yield parse_condition
             elif isinstance(value, list):
-                if key == '$and':
+                if key == "$and":
                     grouped_conditions = None
                     for spec in value:
                         for parse_condition in self.parse_condition(spec):
@@ -375,7 +391,7 @@ class TinyMongoCollection(object):
                                 else grouped_conditions & parse_condition
                             )
                     yield grouped_conditions
-                elif key == '$or':
+                elif key == "$or":
                     grouped_conditions = None
                     for spec in value:
                         for parse_condition in self.parse_condition(spec):
@@ -385,18 +401,18 @@ class TinyMongoCollection(object):
                                 else grouped_conditions | parse_condition
                             )
                     yield grouped_conditions
-                elif key == '$in':
+                elif key == "$in":
                     # use `any` to find with list, before comparing to single string
                     grouped_conditions = Q(q, prev_key).any(value)
                     for val in value:
-                        for parse_condition in self.parse_condition({prev_key : val}):
+                        for parse_condition in self.parse_condition({prev_key: val}):
                             grouped_conditions = (
                                 parse_condition
                                 if not grouped_conditions
                                 else grouped_conditions | parse_condition
                             )
                     yield grouped_conditions
-                elif key == '$all':
+                elif key == "$all":
                     yield Q(q, prev_key).all(value)
                 else:
                     yield Q(q, prev_key).any([value])
@@ -406,10 +422,7 @@ class TinyMongoCollection(object):
     def update(self, query, doc, *args, **kwargs):
         """BAckwards compatibility with update"""
         if isinstance(doc, list):
-            return [
-                self.update_one(query, item, *args, **kwargs)
-                for item in doc
-            ]
+            return [self.update_one(query, item, *args, **kwargs) for item in doc]
         else:
             return self.update_one(query, doc, *args, **kwargs)
 
@@ -438,8 +451,7 @@ class TinyMongoCollection(object):
 
         return UpdateResult(raw_result=result)
 
-    def find(self, filter=None, sort=None, skip=None, limit=None,
-             *args, **kwargs):
+    def find(self, filter=None, sort=None, skip=None, limit=None, *args, **kwargs):
         """
         Finds all matching results
 
@@ -459,12 +471,7 @@ class TinyMongoCollection(object):
             except (AttributeError, TypeError):
                 result = []
 
-        result = TinyMongoCursor(
-            result,
-            sort=sort,
-            skip=skip,
-            limit=limit
-        )
+        result = TinyMongoCursor(result, sort=sort, skip=skip, limit=limit)
 
         return result
 
@@ -497,7 +504,7 @@ class TinyMongoCollection(object):
         :return: DeleteResult
         """
         item = self.find_one(query)
-        result = self.table.remove(where(u'_id') == item[u'_id'])
+        result = self.table.remove(where(u"_id") == item[u"_id"])
 
         return DeleteResult(raw_result=result)
 
@@ -509,10 +516,7 @@ class TinyMongoCollection(object):
         :return: DeleteResult
         """
         items = self.find(query)
-        result = [
-            self.table.remove(where(u'_id') == item[u'_id'])
-            for item in items
-        ]
+        result = [self.table.remove(where(u"_id") == item[u"_id"]) for item in items]
 
         if query == {}:
             # need to reset TinyDB's index for docs order consistency
@@ -561,7 +565,7 @@ class TinyMongoCursor(object):
         # {0: 20, 20: 40, 40: 60, 60: 62}
         if limit and limit < self.count():
             limit = limits.get(skip, self.count())
-            self.cursordat = self.cursordat[skip: limit]
+            self.cursordat = self.cursordat[skip:limit]
 
     def _order(self, value, is_reverse=None):
         """Parsing data to a sortable form
@@ -589,12 +593,9 @@ class TinyMongoCursor(object):
             return result
 
         # (TODO) include more data type
-        if value is None or not isinstance(value, (dict,
-                                                   list,
-                                                   basestring,
-                                                   bool,
-                                                   float,
-                                                   int)):
+        if value is None or not isinstance(
+            value, (dict, list, basestring, bool, float, int)
+        ):
             # not support/sortable value type
             value = (0, None)
 
@@ -644,25 +645,26 @@ class TinyMongoCursor(object):
         sort_specifier = list()
         if isinstance(key_or_list, list):
             if direction is not None:
-                raise ValueError('direction can not be set separately '
-                                 'if sorting by multiple fields.')
+                raise ValueError(
+                    "direction can not be set separately "
+                    "if sorting by multiple fields."
+                )
             for pair in key_or_list:
                 if not (isinstance(pair, list) or isinstance(pair, tuple)):
-                    raise TypeError('key pair should be a list or tuple.')
+                    raise TypeError("key pair should be a list or tuple.")
                 if not len(pair) == 2:
-                    raise ValueError('Need to be (key, direction) pair')
+                    raise ValueError("Need to be (key, direction) pair")
                 if not isinstance(pair[0], basestring):
-                    raise TypeError('first item in each key pair must '
-                                    'be a string')
+                    raise TypeError("first item in each key pair must " "be a string")
                 if not isinstance(pair[1], int) or not abs(pair[1]) == 1:
-                    raise TypeError('bad sort specification.')
+                    raise TypeError("bad sort specification.")
 
             sort_specifier = key_or_list
 
         elif isinstance(key_or_list, basestring):
             if direction is not None:
                 if not isinstance(direction, int) or not abs(direction) == 1:
-                    raise TypeError('bad sort specification.')
+                    raise TypeError("bad sort specification.")
             else:
                 # default ASCENDING
                 direction = 1
@@ -670,8 +672,10 @@ class TinyMongoCursor(object):
             sort_specifier = [(key_or_list, direction)]
 
         else:
-            raise ValueError('Wrong input, pass a field name and a direction,'
-                             ' or pass a list of (key, direction) pairs.')
+            raise ValueError(
+                "Wrong input, pass a field name and a direction,"
+                " or pass a list of (key, direction) pairs."
+            )
 
         # sorting
 
@@ -681,14 +685,14 @@ class TinyMongoCursor(object):
         pre_sect_stack = list()
         for pair in sort_specifier:
 
-            is_reverse = bool(1-pair[1])
+            is_reverse = bool(1 - pair[1])
             value_stack = list()
             for index, data in enumerate(_cursordat):
 
                 # get field value
 
                 not_found = None
-                for key in pair[0].split('.'):
+                for key in pair[0].split("."):
                     not_found = True
 
                     if isinstance(data, dict) and key in data:
@@ -794,6 +798,7 @@ class TinyMongoCursor(object):
 
 class TinyGridFS(object):
     """GridFS for tinyDB"""
+
     def __init__(self, *args, **kwargs):
         self.database = None
 
