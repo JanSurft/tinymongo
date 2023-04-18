@@ -1,30 +1,19 @@
-"""Acts like a Pymongo client to TinyDB"""
-# coding: utf-8
-
-from __future__ import absolute_import
-
 import copy
 from functools import reduce
 import logging
 import os
 from math import ceil
-from operator import itemgetter
 from uuid import uuid1
 
 from tinydb import Query, TinyDB, where
-from .results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
-from .errors import DuplicateKeyError
-
-try:
-    basestring
-except NameError:
-    basestring = str
+from pipesai.tinymongo.results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
+from pipesai.tinymongo.errors import DuplicateKeyError
 
 
 logger = logging.getLogger(__name__)
 
 
-def Q(query, key):
+def q_func(query, key):
     return reduce(
         lambda partial_query, field: partial_query[field], key.split("."), query
     )
@@ -39,6 +28,8 @@ class TinyMongoClient(object):
         try:
             os.mkdir(foldername)
         except OSError as x:
+            logger.info("{}".format(x))
+        except Exception as x:
             logger.info("{}".format(x))
 
     @property
@@ -70,6 +61,9 @@ class TinyMongoClient(object):
 
     def __getitem__(self, key):
         """Gets a new or existing database based in key"""
+        return self._get_db(key)
+
+    def _get_db(self, key):
         return TinyMongoDatabase(key, self._foldername, self._storage)
 
     def close(self):
@@ -78,7 +72,14 @@ class TinyMongoClient(object):
 
     def __getattr__(self, name):
         """Gets a new or existing database based in attribute"""
-        return TinyMongoDatabase(name, self._foldername, self._storage)
+        return self._get_db(name)
+
+    def __repr__(self):
+        return ""
+
+    def __str__(self):
+        return ""
+
 
 
 class TinyMongoDatabase(object):
@@ -104,6 +105,12 @@ class TinyMongoDatabase(object):
         """Get a list of all the collection names in this database"""
         return list(self.tinydb.tables())
 
+    def __repr__(self):
+        return ""
+
+    def __str__(self):
+        return ""
+
 
 class TinyMongoCollection(object):
     """
@@ -122,9 +129,16 @@ class TinyMongoCollection(object):
         self.table = None
         self.parent = parent
 
+    # def __repr__(self):
+    #     """Return collection name"""
+    #     return self.tablename
+
     def __repr__(self):
-        """Return collection name"""
-        return self.tablename
+        return ""
+
+    def __str__(self):
+        return ""
+
 
     def __getattr__(self, name):
         """
@@ -278,6 +292,7 @@ class TinyMongoCollection(object):
         Creates a recursive generator for parsing some types of Query()
         conditions
 
+        :param last_prev_key:
         :param query: Query object
         :param prev_key: The key at the next-higher level
         :return: generator object, the last of which will be the complete
@@ -301,50 +316,50 @@ class TinyMongoCollection(object):
 
             if key == u"$gte":
                 conditions = (
-                    (Q(q, prev_key) >= value)
+                    (q_func(q, prev_key) >= value)
                     if not conditions and prev_key != "$not"
-                    else (conditions & (Q(q, prev_key) >= value))
+                    else (conditions & (q_func(q, prev_key) >= value))
                     if prev_key != "$not"
                     else (q[last_prev_key] < value)
                 )
             elif key == u"$gt":
                 conditions = (
-                    (Q(q, prev_key) > value)
+                    (q_func(q, prev_key) > value)
                     if not conditions and prev_key != "$not"
-                    else (conditions & (Q(q, prev_key) > value))
+                    else (conditions & (q_func(q, prev_key) > value))
                     if prev_key != "$not"
                     else (q[last_prev_key] <= value)
                 )
             elif key == u"$lte":
                 conditions = (
-                    (Q(q, prev_key) <= value)
+                    (q_func(q, prev_key) <= value)
                     if not conditions and prev_key != "$not"
-                    else (conditions & (Q(q, prev_key) <= value))
+                    else (conditions & (q_func(q, prev_key) <= value))
                     if prev_key != "$not"
                     else (q[last_prev_key] > value)
                 )
             elif key == u"$lt":
                 conditions = (
-                    (Q(q, prev_key) < value)
+                    (q_func(q, prev_key) < value)
                     if not conditions and prev_key != "$not"
-                    else (conditions & (Q(q, prev_key) < value))
+                    else (conditions & (q_func(q, prev_key) < value))
                     if prev_key != "$not"
                     else (q[last_prev_key] >= value)
                 )
             elif key == u"$ne":
                 conditions = (
-                    (Q(q, prev_key) != value)
+                    (q_func(q, prev_key) != value)
                     if not conditions and prev_key != "$not"
-                    else (conditions & (Q(q, prev_key) != value))
+                    else (conditions & (q_func(q, prev_key) != value))
                     if prev_key != "$not"
                     else (q[last_prev_key] == value)
                 )
             elif key == u"$not":
                 if not isinstance(value, dict) and not isinstance(value, list):
                     conditions = (
-                        (Q(q, prev_key) != value)
+                        (q_func(q, prev_key) != value)
                         if not conditions and prev_key != "$not"
-                        else (conditions & (Q(q, prev_key) != value))
+                        else (conditions & (q_func(q, prev_key) != value))
                         if prev_key != "$not"
                         else (q[last_prev_key] >= value)
                     )
@@ -356,8 +371,8 @@ class TinyMongoCollection(object):
                 value = value.replace("\\\\", "|||")
                 regex = value.replace("\\", "")
                 regex = regex.replace("|||", "\\")
-                currCond = where(prev_key).matches(regex)
-                conditions = currCond if not conditions else (conditions & currCond)
+                curr_cond = where(prev_key).matches(regex)
+                conditions = curr_cond if not conditions else (conditions & curr_cond)
             elif key in ["$and", "$or", "$in", "$all"]:
                 pass
             else:
@@ -366,11 +381,11 @@ class TinyMongoCollection(object):
                 # (fixes multiple item query that includes $ codes)
                 if not isinstance(value, dict) and not isinstance(value, list):
                     conditions = (
-                        ((Q(q, key) == value) | (Q(q, key).any([value])))
+                        ((q_func(q, key) == value) | (q_func(q, key).any([value])))
                         if not conditions
                         else (
                             conditions
-                            & ((Q(q, key) == value) | (Q(q, key).any([value])))
+                            & ((q_func(q, key) == value) | (q_func(q, key).any([value])))
                         )
                     )
                     prev_key = key
@@ -403,7 +418,7 @@ class TinyMongoCollection(object):
                     yield grouped_conditions
                 elif key == "$in":
                     # use `any` to find with list, before comparing to single string
-                    grouped_conditions = Q(q, prev_key).any(value)
+                    grouped_conditions = q_func(q, prev_key).any(value)
                     for val in value:
                         for parse_condition in self.parse_condition({prev_key: val}):
                             grouped_conditions = (
@@ -413,9 +428,9 @@ class TinyMongoCollection(object):
                             )
                     yield grouped_conditions
                 elif key == "$all":
-                    yield Q(q, prev_key).all(value)
+                    yield q_func(q, prev_key).all(value)
                 else:
-                    yield Q(q, prev_key).any([value])
+                    yield q_func(q, prev_key).any([value])
             else:
                 yield conditions
 
@@ -426,7 +441,7 @@ class TinyMongoCollection(object):
         else:
             return self.update_one(query, doc, *args, **kwargs)
 
-    def update_one(self, query, doc):
+    def update_one(self, query, doc, *args, **kwargs):
         """
         Updates one element of the collection
 
@@ -444,27 +459,27 @@ class TinyMongoCollection(object):
 
         try:
             result = self.table.update(doc, allcond)
-        except:
+        except Exception:
             # TODO: check table.update result
             # check what pymongo does in that case
             result = None
 
         return UpdateResult(raw_result=result)
 
-    def find(self, filter=None, sort=None, skip=None, limit=None, *args, **kwargs):
+    def find(self, _filter=None, sort=None, skip=None, limit=None, *args, **kwargs):
         """
         Finds all matching results
 
-        :param query: dictionary representing the mongo query
+        :param _filter: dictionary representing the mongo query
         :return: cursor containing the search results
         """
         if self.table is None:
             self.build_table()
 
-        if filter is None:
+        if _filter is None:
             result = self.table.all()
         else:
-            allcond = self.parse_query(filter)
+            allcond = self.parse_query(_filter)
 
             try:
                 result = self.table.search(allcond)
@@ -475,18 +490,18 @@ class TinyMongoCollection(object):
 
         return result
 
-    def find_one(self, filter=None):
+    def find_one(self, _filter=None):
         """
         Finds one matching query element
 
-        :param query: dictionary representing the mongo query
+        :param _filter: dictionary representing the mongo query
         :return: the resulting document (if found)
         """
 
         if self.table is None:
             self.build_table()
 
-        allcond = self.parse_query(filter)
+        allcond = self.parse_query(_filter)
 
         return self.table.get(allcond)
 
@@ -594,7 +609,7 @@ class TinyMongoCursor(object):
 
         # (TODO) include more data type
         if value is None or not isinstance(
-            value, (dict, list, basestring, bool, float, int)
+            value, (dict, list, str, bool, float, int)
         ):
             # not support/sortable value type
             value = (0, None)
@@ -605,7 +620,7 @@ class TinyMongoCursor(object):
         elif isinstance(value, (int, float)):
             value = (1, value)
 
-        elif isinstance(value, basestring):
+        elif isinstance(value, str):
             value = (2, value)
 
         elif isinstance(value, dict):
@@ -634,15 +649,15 @@ class TinyMongoCursor(object):
         Sorts a cursor object based on the input
 
         :param key_or_list: a list/tuple containing the sort specification,
-        i.e. ('user_number': -1), or a basestring
+        i.e. ('user_number': -1), or a str
         :param direction: sorting direction, 1 or -1, needed if key_or_list
-                          is a basestring
+                          is a str
         :return:
         """
 
         # checking input format
 
-        sort_specifier = list()
+        # sort_specifier = list()
         if isinstance(key_or_list, list):
             if direction is not None:
                 raise ValueError(
@@ -654,14 +669,14 @@ class TinyMongoCursor(object):
                     raise TypeError("key pair should be a list or tuple.")
                 if not len(pair) == 2:
                     raise ValueError("Need to be (key, direction) pair")
-                if not isinstance(pair[0], basestring):
+                if not isinstance(pair[0], str):
                     raise TypeError("first item in each key pair must " "be a string")
                 if not isinstance(pair[1], int) or not abs(pair[1]) == 1:
                     raise TypeError("bad sort specification.")
 
             sort_specifier = key_or_list
 
-        elif isinstance(key_or_list, basestring):
+        elif isinstance(key_or_list, str):
             if direction is not None:
                 if not isinstance(direction, int) or not abs(direction) == 1:
                     raise TypeError("bad sort specification.")
@@ -765,18 +780,23 @@ class TinyMongoCursor(object):
 
         return self
 
-    def hasNext(self):
+    def limit(self, n):
+        self.cursordat = self.cursordat[:n]
+        return self
+
+    def has_next(self):
         """
         Returns True if the cursor has a next position, False if not
         :return:
         """
         cursor_pos = self.cursorpos + 1
 
-        try:
-            self.cursordat[cursor_pos]
-            return True
-        except IndexError:
-            return False
+        return cursor_pos + 1 < len(self.cursordat)
+        # try:
+        #     self.cursordat[cursor_pos]
+        #     return True
+        # except IndexError:
+        #     return False
 
     def next(self):
         """
@@ -795,6 +815,12 @@ class TinyMongoCursor(object):
         """
         return len(self.cursordat)
 
+    def __repr__(self):
+        return ""
+
+    def __str__(self):
+        return ""
+
 
 class TinyGridFS(object):
     """GridFS for tinyDB"""
@@ -802,7 +828,7 @@ class TinyGridFS(object):
     def __init__(self, *args, **kwargs):
         self.database = None
 
-    def GridFS(self, tinydatabase):
+    def grid_fs(self, tinydatabase):
         """TODO: Must implement yet"""
         self.database = tinydatabase
         return self
@@ -811,7 +837,8 @@ class TinyGridFS(object):
 def generate_id():
     """Generate new UUID"""
     # TODO: Use six.string_type to Py3 compat
-    try:
-        return unicode(uuid1()).replace(u"-", u"")
-    except NameError:
-        return str(uuid1()).replace(u"-", u"")
+    return str(uuid1()).replace(u"-", u"")
+    # try:
+    #     return unicode(uuid1()).replace(u"-", u"")
+    # except NameError:
+    #     return str(uuid1()).replace(u"-", u"")
