@@ -3,7 +3,7 @@ import copy
 import json
 import pytest
 import pymongo
-import tinymongo as tm
+import tinymongodb as tm
 
 # setup the db
 db_name = os.path.abspath('./test_db')

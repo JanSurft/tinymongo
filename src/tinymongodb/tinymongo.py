@@ -6,8 +6,8 @@ from math import ceil
 from uuid import uuid1
 
 from tinydb import Query, TinyDB, where
-from pipesai.tinymongo.results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
-from pipesai.tinymongo.errors import DuplicateKeyError
+from tinymongodb.results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
+from tinymongodb.errors import DuplicateKeyError
 
 
 logger = logging.getLogger(__name__)
