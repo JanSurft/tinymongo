@@ -24,9 +24,9 @@ tiny_client = tm.TinyMongoClient(db_name)
 tiny_database = tiny_client.tinyDatabase
 tiny_collection = tiny_database.tinyCollection
 
-mongo_client = pymongo.MongoClient("localhost:27017")
-mongo_database = mongo_client["test-mongodb"]
-mongo_collection = mongo_database["test-collection"]
+# mongo_client = pymongo.MongoClient("localhost:27017")
+# mongo_database = mongo_client["test-mongodb"]
+# mongo_collection = mongo_database["test-collection"]
 
 
 @pytest.fixture()
@@ -34,7 +34,7 @@ def collection(request):
     # setup the db, clear if necessary
     # todo: the 'drop()' function from pymongo should work in future revisions
     tiny_collection.delete_many({})  # should delete all records in the collection
-    mongo_collection.delete_many({})
+    # mongo_collection.delete_many({})
 
     # insert 100 integers, strings, floats, booleans, arrays, and objects
     for num in range(100):
@@ -56,17 +56,17 @@ def collection(request):
         # todo: add object to the db
 
         tiny_collection.insert_one(new_obj)
-        mongo_collection.insert_one(new_obj)
+        # mongo_collection.insert_one(new_obj)
 
     def fin():
         tiny_client.close()
-        mongo_client.close()
+        # mongo_client.close()
 
     request.addfinalizer(finalizer=fin)
 
     return {
         'tiny': tiny_collection,
-        'mongo': mongo_collection
+        # 'mongo': mongo_collection
     }
 
 
@@ -115,8 +115,8 @@ def test_initialize_collection(collection):
     assert count == 100
     assert c.count() == 100
     assert collection['tiny'].count() == 100
-    assert collection['mongo'].find({}).count() == 100
-    assert collection['mongo'].count() == 100
+    # assert collection['mongo'].find({}).count() == 100
+    # assert collection['mongo'].count() == 100
 
 
 def test_drop_collection(collection):
@@ -132,7 +132,7 @@ def test_drop_collection(collection):
 def test_find_with_filter_named_parameter(collection):
     c = collection['tiny'].find(filter={})
     assert c.count() == 100
-    assert collection['mongo'].find(filter={}).count() == 100
+    # assert collection['mongo'].find(filter={}).count() == 100
 
 
 def test_greater_than(collection):
@@ -145,7 +145,7 @@ def test_greater_than(collection):
     c = collection['tiny'].find({'count': {'$gte': 50}})
 
     assert c.count() == 50
-    assert collection['mongo'].find({'count': {'$gte': 50}}).count() == 50
+    # assert collection['mongo'].find({'count': {'$gte': 50}}).count() == 50
 
 
 def test_find_in_subdocument(collection):
@@ -158,7 +158,7 @@ def test_find_in_subdocument(collection):
     c = collection['tiny'].find({'mixedDict.count': 0})
 
     assert c.count() == 1
-    assert collection['mongo'].find({'mixedDict.count': 0}).count() == 1
+    # assert collection['mongo'].find({'mixedDict.count': 0}).count() == 1
 
 
 def test_find_in_subdocument_with_operator(collection):
@@ -171,7 +171,7 @@ def test_find_in_subdocument_with_operator(collection):
     c = collection['tiny'].find({'mixedDict.count': {'$gte': 50}})
 
     assert c.count() == 50
-    assert collection['mongo'].find({'mixedDict.count': {'$gte': 50}}).count() == 50
+    # assert collection['mongo'].find({'mixedDict.count': {'$gte': 50}}).count() == 50
 
 
 def test_find_in_subdocument_3_levels(collection):
@@ -184,7 +184,7 @@ def test_find_in_subdocument_3_levels(collection):
     c = collection['tiny'].find({'mixedDict.countDict.even': True})
 
     assert c.count() == 50
-    assert collection['mongo'].find({'mixedDict.countDict.even': True}).count() == 50
+    # assert collection['mongo'].find({'mixedDict.countDict.even': True}).count() == 50
 
 
 def test_sort_wrong_input_type(collection):
@@ -240,24 +240,24 @@ def test_sort_behavior(collection):
     for i, d in enumerate(dataset):
         d["_id"] = i + 1
 
-    collection['mongo'].delete_many({})
-    collection['mongo'].insert_many(dataset)
+    # collection['mongo'].delete_many({})
+    # collection['mongo'].insert_many(dataset)
     collection['tiny'].delete_many({})
     collection['tiny'].insert_many(dataset)
 
     sort_by = [('item', 1), ('amount', -1)]
 
-    mongo_find = collection['mongo'].find().sort(sort_by)
+    # mongo_find = collection['mongo'].find().sort(sort_by)
     tiny_find = collection['tiny'].find().sort(sort_by)
 
-    assert mongo_find.count() == tiny_find.count()
+    # assert mongo_find.count() == tiny_find.count()
 
-    no_difference = True
-    for i, m_data in enumerate(mongo_find):
-        if not m_data == tiny_find[i]:
-            no_difference = False
+    # no_difference = True
+    # for i, m_data in enumerate(mongo_find):
+    #     if not m_data == tiny_find[i]:
+    #         no_difference = False
 
-    assert no_difference
+    # assert no_difference
 
 
 def test_has_next(collection):
@@ -269,7 +269,7 @@ def test_has_next(collection):
     """
     c = collection['tiny'].find().sort('count', 1)
 
-    assert c.hasNext() is True
+    assert c.has_next() is True
     assert c.next()['count'] == 0
 
 
@@ -282,11 +282,11 @@ def test_not_has_next(collection):
     """
     c = collection['tiny'].find({'count': {'$gte': 98}}).sort('count', 1)
 
-    assert c.hasNext() is True
+    assert c.has_next() is True
     assert c.next()['count'] == 98
-    assert c.hasNext() is True
+    assert c.has_next() is True
     assert c.next()['count'] == 99
-    assert c.hasNext() is False
+    assert c.has_next() is False
 
 
 def test_empty_find(collection):

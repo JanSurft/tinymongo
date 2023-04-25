@@ -74,13 +74,6 @@ class TinyMongoClient(object):
         """Gets a new or existing database based in attribute"""
         return self._get_db(name)
 
-    def __repr__(self):
-        return ""
-
-    def __str__(self):
-        return ""
-
-
 
 class TinyMongoDatabase(object):
     """Representation of a Pymongo database"""
@@ -105,12 +98,6 @@ class TinyMongoDatabase(object):
         """Get a list of all the collection names in this database"""
         return list(self.tinydb.tables())
 
-    def __repr__(self):
-        return ""
-
-    def __str__(self):
-        return ""
-
 
 class TinyMongoCollection(object):
     """
@@ -129,16 +116,9 @@ class TinyMongoCollection(object):
         self.table = None
         self.parent = parent
 
-    # def __repr__(self):
-    #     """Return collection name"""
-    #     return self.tablename
-
     def __repr__(self):
-        return ""
-
-    def __str__(self):
-        return ""
-
+        """Return collection name"""
+        return self.tablename
 
     def __getattr__(self, name):
         """
@@ -490,18 +470,18 @@ class TinyMongoCollection(object):
 
         return result
 
-    def find_one(self, _filter=None):
+    def find_one(self, filter=None):
         """
         Finds one matching query element
 
-        :param _filter: dictionary representing the mongo query
+        :param filter: dictionary representing the mongo query
         :return: the resulting document (if found)
         """
 
         if self.table is None:
             self.build_table()
 
-        allcond = self.parse_query(_filter)
+        allcond = self.parse_query(filter)
 
         return self.table.get(allcond)
 
@@ -814,12 +794,6 @@ class TinyMongoCursor(object):
         :return: number of records
         """
         return len(self.cursordat)
-
-    def __repr__(self):
-        return ""
-
-    def __str__(self):
-        return ""
 
 
 class TinyGridFS(object):
