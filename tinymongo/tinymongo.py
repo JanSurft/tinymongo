@@ -12,9 +12,10 @@ from operator import itemgetter
 from uuid import uuid1
 
 from tinydb import Query, TinyDB, where
-from .results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
-from .errors import DuplicateKeyError
-
+# from .results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
+# from .errors import DuplicateKeyError
+from tinymongodb.results import InsertOneResult, InsertManyResult, UpdateResult, DeleteResult
+from tinymongodb.errors import DuplicateKeyError
 try:
     basestring
 except NameError:
@@ -70,6 +71,9 @@ class TinyMongoClient(object):
 
     def __getitem__(self, key):
         """Gets a new or existing database based in key"""
+        return self._get_db(key)
+
+    def _get_db(self, key):
         return TinyMongoDatabase(key, self._foldername, self._storage)
 
     def close(self):
@@ -78,7 +82,8 @@ class TinyMongoClient(object):
 
     def __getattr__(self, name):
         """Gets a new or existing database based in attribute"""
-        return TinyMongoDatabase(name, self._foldername, self._storage)
+        # return TinyMongoDatabase(name, self._foldername, self._storage)
+        return self._get_db(name)
 
 
 class TinyMongoDatabase(object):
@@ -458,20 +463,21 @@ class TinyMongoCollection(object):
 
         return UpdateResult(raw_result=result)
 
-    def find(self, filter=None, sort=None, skip=None, limit=None, *args, **kwargs):
+    def find(self, _filter=None, sort=None, skip=None, limit=None, *args, **kwargs):
         """
         Finds all matching results
 
-        :param query: dictionary representing the mongo query
+        :param _filter: dictionary representing the mongo query
+        :type _filter: Optional[dict]
         :return: cursor containing the search results
         """
         if self.table is None:
             self.build_table()
 
-        if filter is None:
+        if _filter is None:
             result = self.table.all()
         else:
-            allcond = self.parse_query(filter)
+            allcond = self.parse_query(_filter)
 
             try:
                 result = self.table.search(allcond)
@@ -482,7 +488,7 @@ class TinyMongoCollection(object):
 
         return result
 
-    def find_one(self, filter=None):
+    def find_one(self, _filter=None):
         """
         Finds one matching query element
 
@@ -493,7 +499,7 @@ class TinyMongoCollection(object):
         if self.table is None:
             self.build_table()
 
-        allcond = self.parse_query(filter)
+        allcond = self.parse_query(_filter)
 
         return self.table.get(allcond)
 
@@ -601,7 +607,8 @@ class TinyMongoCursor(object):
 
         # (TODO) include more data type
         if value is None or not isinstance(
-            value, (dict, list, basestring, bool, float, int)
+            # value, (dict, list, basestring, bool, float, int)
+            value, (dict, list, str, bool, float, int)
         ):
             # not support/sortable value type
             value = (0, None)
@@ -612,7 +619,9 @@ class TinyMongoCursor(object):
         elif isinstance(value, (int, float)):
             value = (1, value)
 
-        elif isinstance(value, basestring):
+        # elif isinstance(value, basestring):
+        elif isinstance(value, str):
+
             value = (2, value)
 
         elif isinstance(value, dict):
@@ -641,9 +650,11 @@ class TinyMongoCursor(object):
         Sorts a cursor object based on the input
 
         :param key_or_list: a list/tuple containing the sort specification,
-        i.e. ('user_number': -1), or a basestring
+        # i.e. ('user_number': -1), or a basestring
+        i.e. ('user_number': -1), or a str
         :param direction: sorting direction, 1 or -1, needed if key_or_list
-                          is a basestring
+                          # is a basestring
+                          is a str
         :return:
         """
 
@@ -661,14 +672,16 @@ class TinyMongoCursor(object):
                     raise TypeError("key pair should be a list or tuple.")
                 if not len(pair) == 2:
                     raise ValueError("Need to be (key, direction) pair")
-                if not isinstance(pair[0], basestring):
+                # if not isinstance(pair[0], basestring):
+                if not isinstance(pair[0], str):
                     raise TypeError("first item in each key pair must " "be a string")
                 if not isinstance(pair[1], int) or not abs(pair[1]) == 1:
                     raise TypeError("bad sort specification.")
 
             sort_specifier = key_or_list
 
-        elif isinstance(key_or_list, basestring):
+        # elif isinstance(key_or_list, basestring):
+        elif isinstance(key_or_list, str):
             if direction is not None:
                 if not isinstance(direction, int) or not abs(direction) == 1:
                     raise TypeError("bad sort specification.")
@@ -772,6 +785,19 @@ class TinyMongoCursor(object):
 
         return self
 
+    def limit(self, n):
+        self.cursordat = self.cursordat[:n]
+        return self
+
+    def has_next(self):
+        """
+        Returns True if the cursor has a next position, False if not
+        :return:
+        """
+        cursor_pos = self.cursorpos + 1
+
+        return cursor_pos + 1 < len(self.cursordat)
+
     def hasNext(self):
         """
         Returns True if the cursor has a next position, False if not
@@ -823,16 +849,25 @@ class TinyGridFS(object):
     def __init__(self, *args, **kwargs):
         self.database = None
 
+    def grid_fs(self, tinydatabase):
+        """TODO: Must implement yet"""
+        self.database = tinydatabase
+        return self
+
     def GridFS(self, tinydatabase):
         """TODO: Must implement yet"""
         self.database = tinydatabase
         return self
 
-
 def generate_id():
     """Generate new UUID"""
     # TODO: Use six.string_type to Py3 compat
-    try:
-        return unicode(uuid1()).replace(u"-", u"")
-    except NameError:
-        return str(uuid1()).replace(u"-", u"")
+    return str(uuid1()).replace(u"-", u"")
+
+# def generate_id():
+#     """Generate new UUID"""
+#     # TODO: Use six.string_type to Py3 compat
+#     try:
+#         return unicode(uuid1()).replace(u"-", u"")
+#     except NameError:
+#         return str(uuid1()).replace(u"-", u"")
