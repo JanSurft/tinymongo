@@ -152,6 +152,13 @@ class TinyMongoCollection(object):
         """
         return self.find().count()
 
+    def count_documents(self, filter=None):
+        """
+        Counts the documents in the collection.
+        :return: Integer representing the number of documents in the collection.
+        """
+        return self.find(filter).count()
+
     def drop(self, **kwargs):
         """
         Removes a collection from the database.
@@ -426,7 +433,7 @@ class TinyMongoCollection(object):
         else:
             return self.update_one(query, doc, *args, **kwargs)
 
-    def update_one(self, query, doc):
+    def update_one(self, query, doc, *args, **kwargs):
         """
         Updates one element of the collection
 
@@ -794,6 +801,20 @@ class TinyMongoCursor(object):
         :return: number of records
         """
         return len(self.cursordat)
+
+    def __iter__(self):
+        self.cursorpos = -1
+        return self
+
+    def __next__(self):
+        """
+        Returns the next record
+        :return:
+        """
+        if not self.hasNext():
+            raise StopIteration
+        self.cursorpos += 1
+        return self.cursordat[self.cursorpos]
 
 
 class TinyGridFS(object):
