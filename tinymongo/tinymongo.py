@@ -67,6 +67,7 @@ class TinyMongoClient(object):
                     return serialization
 
         """
+        # return storages.JSONStorage
         return TinyDB.default_storage_class
 
     def __getitem__(self, key):
